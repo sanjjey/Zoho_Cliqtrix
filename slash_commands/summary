@@ -1,0 +1,110 @@
+
+info user;
+approverEmail = user.get("email");
+// =========================================================
+// 0️⃣-A Fetch ZOHO EXPENSE Organization (INDIA DC FIX)
+// =========================================================
+// 🚨 IMPORTANT: We use '.in' here because you are in India
+expenseOrgResp = invokeurl
+[
+	url :"https://expense.zoho.com/api/v1/organizations"
+	type :GET
+	connection:"expense_bot_connection"
+];
+my_expense_org_id = "";
+if(expenseOrgResp.containsKey("organizations"))
+{
+	// 1. Try to find the Default Org
+	for each  org in expenseOrgResp.get("organizations")
+	{
+		if(org.get("is_default") == true)
+		{
+			my_expense_org_id = org.get("organization_id");
+			break;
+		}
+	}
+	// 2. Fallback to any valid Org if default is missing
+	if(my_expense_org_id == "")
+	{
+		for each  org in expenseOrgResp.get("organizations")
+		{
+			my_expense_org_id = org.get("organization_id");
+			break;
+		}
+	}
+}
+// =========================================================
+// 0️⃣-B Fetch ZOHO CLIQ Organization (For Comparison)
+// =========================================================
+// You need a 'my_cliq_conn' connection for this part. 
+// If you don't have it, this part will be skipped/empty.
+my_cliq_org_id = "Not Fetched (Requires Cliq Connection)";
+/* // Uncomment this block if you have 'my_cliq_conn' set up
+cliqResp = invokeurl
+[
+    url :"https://cliq.zoho.in/api/v2/companies"
+    type :GET
+    connection:"my_cliq_conn"
+];
+if(cliqResp.containsKey("companies"))
+{
+    for each c in cliqResp.get("companies")
+    {
+        if(c.get("is_default") == true)
+        {
+            my_cliq_org_id = c.get("id");
+        }
+    }
+}
+*/
+// =========================================================
+// 1️⃣ VALIDATION
+// =========================================================
+if(my_expense_org_id == "")
+{
+	return {"text":"⚠ Error: Still cannot find an Expense Organization on 'expense.zoho.in'. Check your permissions."};
+}
+// =========================================================
+// 2️⃣ "DO THE THING" (Fetch Pending Reports)
+// =========================================================
+// Note: We use my_expense_org_id here. Using Cliq ID would fail.
+pendingURL = "https://expense.zoho.com/api/v1/expensereports?filter_by=Pending Approval&organization_id=" + my_expense_org_id;
+pendingResp = invokeurl
+[
+	url :pendingURL
+	type :GET
+	connection:"expense_bot_connection"
+];
+pendingReports = List();
+if(pendingResp.containsKey("expense_reports"))
+{
+	pendingReports = pendingResp.get("expense_reports");
+}
+// =========================================================
+// 3️⃣ BUILD OUTPUT
+// =========================================================
+summaryMsg = "📊 **Expense Approval Summary**\n";
+summaryMsg = summaryMsg + "🏢 Expense Org ID: `" + my_expense_org_id + "` (India DC)\n";
+summaryMsg = summaryMsg + "💬 Cliq Org ID: `" + my_cliq_org_id + "`\n";
+summaryMsg = summaryMsg + "--------------------------------\n";
+count = pendingReports.size();
+summaryMsg = summaryMsg + "⏳ **Pending Approval:** " + count + "\n";
+if(count > 0)
+{
+	i = 0;
+	for each  p in pendingReports
+	{
+		i = i + 1;
+		summaryMsg = summaryMsg + i + ". " + p.get("report_name") + " | " + p.get("currency_symbol") + p.get("total") + "\n";
+		if(i >= 5)
+		{
+			summaryMsg = summaryMsg + "_...more in Zoho Expense_\n";
+			break;
+		}
+	}
+}
+else
+{
+	summaryMsg = summaryMsg + "✔ All caught up! No pending reports.\n";
+}
+return {"text":summaryMsg};
