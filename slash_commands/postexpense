@@ -1,0 +1,167 @@
+
+/* COMMAND: Show expense submission form */
+// Fetch organization ID dynamically (replacing hardcoded ID)
+expenseOrgResp = invokeurl
+[
+    url :"https://expense.zoho.com/api/v1/organizations"
+    type :GET
+    connection:"expense_bot_connection"
+];
+my_org_id = "";
+if(expenseOrgResp.containsKey("organizations"))
+{
+    // 1. Try to find the Default Org
+    for each  org in expenseOrgResp.get("organizations")
+    {
+        if(org.get("is_default") == true)
+        {
+            my_org_id = org.get("organization_id");
+            break;
+        }
+    }
+    // 2. Fallback to any valid Org if default is missing
+    if(my_org_id == "")
+    {
+        for each  org in expenseOrgResp.get("organizations")
+        {
+            my_org_id = org.get("organization_id");
+            break;
+        }
+    }
+}
+// Validation - if no org found, return error
+if(my_org_id == "")
+{
+    return {"text":"⚠ Error: Cannot find an Expense Organization. Check your permissions and connection."};
+}
+inputs = List();
+// ... rest of your command code remains the same ...
+// Merchant
+merchantField = Map();
+merchantField.put("type","text");
+merchantField.put("name","merchant");
+merchantField.put("label","Merchant Name");
+merchantField.put("placeholder","e.g. Starbucks");
+inputs.add(merchantField);
+// Amount
+amountField = Map();
+amountField.put("type","text");
+amountField.put("name","amount");
+amountField.put("label","Amount");
+amountField.put("placeholder","e.g. 50.00");
+inputs.add(amountField);
+// Category (dropdown – values are IDs)
+categoryField = Map();
+categoryField.put("type","select");
+categoryField.put("name","category");
+categoryField.put("label","Category");
+categoryField.put("placeholder","Select a category");
+// mandatory
+categoryOptions = List();
+// 1. Air Travel Expense
+opt1 = Map();
+opt1.put("label","Air Travel Expense");
+opt1.put("value","7558662000000000418");
+categoryOptions.add(opt1);
+// 2. Lodging
+opt2 = Map();
+opt2.put("label","Lodging");
+opt2.put("value","7558662000000032023");
+categoryOptions.add(opt2);
+// 3. Meals
+opt3 = Map();
+opt3.put("label","Meals");
+opt3.put("value","7558662000000105042");
+categoryOptions.add(opt3);
+// 4. Fuel/Mileage Expenses
+opt4 = Map();
+opt4.put("label","Fuel/Mileage Expenses");
+opt4.put("value","7558662000000093294");
+categoryOptions.add(opt4);
+// 5. Other Expenses
+opt5 = Map();
+opt5.put("label","Other Expenses");
+opt5.put("value","7558662000000000460");
+categoryOptions.add(opt5);
+categoryField.put("options",categoryOptions);
+inputs.add(categoryField);
+// Description (optional)
+descField = Map();
+descField.put("type","textarea");
+descField.put("name","description");
+descField.put("label","Description");
+descField.put("placeholder","Optional description for this expense");
+inputs.add(descField);
+// Receipt file
+fileField = Map();
+fileField.put("type","file");
+fileField.put("name","receipt_file");
+fileField.put("label","Upload Receipt");
+inputs.add(fileField);
+// Approver Email
+approverField = Map();
+approverField.put("type","text");
+approverField.put("name","approver_email");
+approverField.put("label","Approver Email");
+approverField.put("placeholder","approver@company.com");
+inputs.add(approverField);
+// =======================
+// Report selection (NEW)
+// =======================
+reportSelectField = Map();
+reportSelectField.put("type","select");
+reportSelectField.put("name","report_selection");
+reportSelectField.put("label","Report");
+reportSelectField.put("placeholder","Create new or choose existing");
+reportOptions = List();
+// First option: create new
+optNew = Map();
+optNew.put("label","➡ Create New Report");
+optNew.put("value","__new__");
+reportOptions.add(optNew);
+// Fetch existing reports from Zoho Expense (draft/submitted etc.)
+reportsUrl = "https://expense.zoho.com/api/v1/expensereports";
+paramsMap = Map();
+paramsMap.put("organization_id",my_org_id);
+reportsResp = invokeurl
+[
+    url :reportsUrl
+    type :GET
+    parameters:paramsMap
+    connection:"expense_bot_connection"
+];
+// Expecting array "expense_reports"
+existingReports = reportsResp.get("expense_reports");
+if(existingReports != null)
+{
+    for each  r in existingReports
+    {
+        repId = r.get("report_id");
+        repName = r.get("report_name");
+        repStatus = r.get("status");
+        if(repId != null)
+        {
+            optRep = Map();
+            // Label like: "Trip to SFA (draft)"
+            optRep.put("label",repName + " (" + repStatus + ")");
+            optRep.put("value",repId.toString());
+            reportOptions.add(optRep);
+        }
+    }
+}
+reportSelectField.put("options",reportOptions);
+inputs.add(reportSelectField);
+// Main form object
+form = Map();
+form.put("type","form");
+form.put("title","Submit Expense");
+form.put("hint","Fill details and upload the receipt.");
+form.put("name","expense_form");
+form.put("inputs",inputs);
+// Action: handler function
+action = Map();
+action.put("type","invoke.function");
+action.put("name","postexpense");
+// must match handler
+form.put("action",action);
+return form;
