@@ -1,0 +1,94 @@
+string Submission_Expense(string report_Id, string approver_email)
+{
+// -----------------------------------------------------------
+// 0️⃣ Validation
+// -----------------------------------------------------------
+expenseOrgResp = invokeurl
+[
+	url :"https://expense.zoho.com/api/v1/organizations"
+	type :GET
+	connection:"expense_bot_connection"
+];
+OrgID = "";
+if(expenseOrgResp.containsKey("organizations"))
+{
+	// 1. Try to find the Default Org
+	for each  org in expenseOrgResp.get("organizations")
+	{
+		if(org.get("is_default") == true)
+		{
+			OrgID = org.get("organization_id");
+			break;
+		}
+	}
+	// 2. Fallback to any valid Org if default is missing
+	if(OrgID == "")
+	{
+		for each  org in expenseOrgResp.get("organizations")
+		{
+			OrgID = org.get("organization_id");
+			break;
+		}
+	}
+}
+// Validation - if no org found, return error
+if(OrgID == "")
+{
+	return {"text":"⚠ Error: Cannot find an Expense Organization. Check your permissions and connection."};
+}
+// -----------------------------------------------------------
+// 1️⃣ Look up the Approver's ID
+// -----------------------------------------------------------
+// We utilize the passed 'OrgID' here immediately
+approverID = "";
+// Search for the user by email
+userSearchURL = "https://expense.zoho.in/api/v1/users?search_text=" + approver_email + "&organization_id=" + OrgID;
+userResp = invokeurl
+[
+	url :userSearchURL
+	type :GET
+	connection:"expense_bot_connection"
+];
+if(userResp.containsKey("users"))
+{
+	usersList = userResp.get("users");
+	for each  u in usersList
+	{
+		// exact match check
+		if(u.get("email") == approver_email)
+		{
+			approverID = u.get("user_id");
+			break;
+		}
+	}
+}
+// 🚨 APPROVER ERROR
+if(approverID == "")
+{
+	return "❌ Approver Error: The email '" + approver_email + "' was not found in this organization.";
+}
+// -----------------------------------------------------------
+// 2️⃣ Submit the Report
+// -----------------------------------------------------------
+submitURL = "https://expense.zoho.in/api/v1/expensereports/" + report_Id + "/submit?organization_id=" + OrgID;
+paramMap = Map();
+paramMap.put("approver_id",approverID);
+response = invokeurl
+[
+	url :submitURL
+	type :POST
+	parameters:paramMap
+	connection:"expense_bot_connection"
+];
+// -----------------------------------------------------------
+// 3️⃣ Handle Response
+// -----------------------------------------------------------
+if(response.get("code") == 0)
+{
+	return "✅ Success: Report submitted to " + approver_email;
+}
+else
+{
+	return "⚠ API Error: " + response.get("message");
+}
+}

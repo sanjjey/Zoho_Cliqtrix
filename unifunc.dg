@@ -1,0 +1,33 @@
+int call_function(string reportId, string notes, string description, list items, string approver_Id)
+{
+// Call the function and extract risk score
+result = unifunc(reportId,notes,description,items,approver_Id);
+// Check if the function returned an error - return -1 for errors
+if(result.containsKey("status") && result.get("status") == "error")
+{
+	info "Risk assessment failed - returning -1";
+	return -1;
+}
+riskScore = result.get("riskscore");
+violationSummary = result.get("violationsumm");
+// Decision making based on risk score (just for logging)
+if(riskScore >= 70)
+{
+	info "HIGH RISK: " + riskScore + " - Escalating to senior management";
+}
+else if(riskScore >= 40)
+{
+	info "MEDIUM RISK: " + riskScore + " - Standard approval process";
+}
+else if(riskScore >= 20)
+{
+	info "LOW RISK: " + riskScore + " - Quick review required";
+}
+else
+{
+	info "VERY LOW RISK: " + riskScore + " - Auto approving";
+}
+info "Violation Summary: " + violationSummary;
+// Return just the risk score as integer
+return riskScore;
+}
