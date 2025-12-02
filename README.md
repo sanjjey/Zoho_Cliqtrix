@@ -29,4 +29,4 @@ eploy the extension.
 This project was developed as a solution for the **Zoho Cliq Trix** competition, aimed at extending the capabilities of the Zoho Cliq platform to solve real-world business problems.
 
 ---
-*Created by [Your Name]*
+*Created by [Sanjjey Arumugam and Vigneshwarran S]*
